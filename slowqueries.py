@@ -11,10 +11,10 @@ import rollbar
 
 VERSION = 0.1
 
-TIME_PATTERN = r'^# Time: (?P<date>[0-9]{6}) (?P<time>[0-9]{2}:[0-9]{2}:[0-9]{2})$'
+TIME_PATTERN = r'^#\s+Time:\s+(?P<date>[0-9]{6})\s+(?P<time>[0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2})$'
 USER_HOST_PATTERN = r'^# User@Host: (?P<user_host>.* @ .*)$'
-QUERY_STATS_PATTERN = r'^# Query_time: (?P<query_seconds>[0-9]\.[0-9]+)\s+' \
-                      r'Lock_time: (?P<lock_time>[0-9]\.[0-9]+)\s+' \
+QUERY_STATS_PATTERN = r'^# Query_time: (?P<query_seconds>[0-9]+\.[0-9]+)\s+' \
+                      r'Lock_time: (?P<lock_time>[0-9]+\.[0-9]+)\s+' \
                       r'Rows_sent: (?P<rows_sent>[0-9]+)\s+' \
                       r'Rows_examined: (?P<rows_examined>[0-9]+)$'
 
@@ -23,7 +23,7 @@ QUERY_PATTERN = r'^\s*(?P<query>[^;]+;)$'
 # replication adds in the SET timestamp= line which we'll just ignore
 IGNORE_PATTERNS = (r'^\s*use .*;$', r'^\s*SET timestamp=[0-9]+;$')
 
-# e.g. 
+# e.g.
 #
 # # Time: 121228 15:24:25
 # # User@Host: user[db] @ host [10.10.10.10]
@@ -50,7 +50,13 @@ def process_event(header, event):
         level = heuristic(header, event)
         if level and NOTIFICATION_LEVELS[level] >= notification_level:
             extra = {'header': header, 'data': event}
-            rollbar.report_message(name, level=level, extra_data=extra, payload_data={'language': 'sql'})
+            if debug:
+                print("\n===== DEBUG REPORT =====\n")
+                print("rollbar.report_message(%(name)s, level=%(level)s, extra_data=%(extra)r, "
+                      "payload_data={'language': 'sql'})" %
+                      {'name': name, 'level': level, 'extra': extra})
+            else:
+                rollbar.report_message(name, level=level, extra_data=extra, payload_data={'language': 'sql'})
 
 
 def process_input():
@@ -112,11 +118,18 @@ def build_option_parser():
                       help='The minimum level to notify Rollbar at. ' \
                            'Valid values: 0 - debug, 1 - info, 2 - warning, 3 - error, ' \
                            '4 - critical')
+
+    parser.add_option('-D',
+                      '--debug',
+                      dest='debug',
+                      action='store_true',
+                      default=False,
+                      help='Run in debug mode; does not report to rollbar; prints to stdout.')
     return parser
 
 
 def main():
-    global heuristics, notification_level
+    global heuristics, notification_level, debug
 
     parser = build_option_parser()
     (options, args) = parser.parse_args(sys.argv)
@@ -130,6 +143,7 @@ def main():
     notification_level = min(NOTIFICATION_LEVELS['critical'],
                              max(NOTIFICATION_LEVELS['debug'],
                                  options.notification_level))
+    debug = options.debug
 
     rollbar.init(access_token, environment)
 
@@ -179,7 +193,7 @@ class TooManyRowsExamined(Heuristic):
 
 class RatioOfExaminedRowsTooHigh(Heuristic):
     def calculate_val(self, header, event):
-	if int(header['rows_sent']) > 0:
+        if int(header['rows_sent']) > 0:
             return int(header['rows_examined']) / float(header['rows_sent'])
         else:
             return 0
