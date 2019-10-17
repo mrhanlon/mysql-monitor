@@ -11,7 +11,7 @@ import rollbar
 
 VERSION = 0.1
 
-TIME_PATTERN = r'^#\s+Time:\s+(?P<date>[0-9]{6})\s+(?P<time>[0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2})$'
+TIME_PATTERN = r'^# Time: (?P<date>[0-9]{6}) (?P<time>[0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2})$'
 USER_HOST_PATTERN = r'^# User@Host: (?P<user_host>.* @ .*)$'
 QUERY_STATS_PATTERN = r'^# Query_time: (?P<query_seconds>[0-9]+\.[0-9]+)\s+' \
                       r'Lock_time: (?P<lock_time>[0-9]+\.[0-9]+)\s+' \
@@ -46,7 +46,7 @@ def process_event(header, event):
     """
     Notify Rollbar about this query if the event passes the heuristics.
     """
-    for name, heuristic in heuristics.iteritems():
+    for name, heuristic in heuristics.items():
         level = heuristic(header, event)
         if level and NOTIFICATION_LEVELS[level] >= notification_level:
             extra = {'header': header, 'data': event}
